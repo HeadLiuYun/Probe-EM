@@ -1,0 +1,14 @@
+cloud-volume==12.8.0
+kimimaro==5.8.0
+matplotlib
+networkx
+numba==0.62.1
+numpy
+opencv-python
+pandas
+pillow
+scipy
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0
+tqdm
