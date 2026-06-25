@@ -42,7 +42,3 @@ python run_parallel.py --config config.json
 
 By default, the pipeline uses SAM 2 semantic verification.
 
-## Notes
-
-- Keep private paths in `config.json`; the tracked `config.example.json` only contains placeholders.
-- Make sure the paper, CMT metadata, and repository link use the same project name: `Probe-EM`.
