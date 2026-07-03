@@ -24,7 +24,7 @@ PyTorch instructions.
 ## SAM 2
 
 Install SAM 2 from your local clone or from the official repository, then make
-sure its config files and checkpoints match the paths in `config.json`.
+sure its config files and checkpoints match the paths in `configs/config.json`.
 
 ```bash
 cd /path/to/sam2
@@ -42,8 +42,8 @@ pip install -r requirements.txt
 ## Configuration
 
 ```bash
-cp config.example.json config.json
+cp configs/config.example.json configs/config.json
 ```
 
-Edit `config.json` and set local paths for `raw_path`, `seg_path`,
+Edit `configs/config.json` and set local paths for `raw_path`, `seg_path`,
 `checkpoint_sam`, and other output paths.

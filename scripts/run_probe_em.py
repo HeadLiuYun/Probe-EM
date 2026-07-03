@@ -1,50 +1,41 @@
 ﻿import os
 import argparse
+import sys
 
 import time
-import shutil
 import json
 import networkx as nx
 import matplotlib.pyplot as plt
-from collections import deque
 import numpy as np
-import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 # Core pipeline functions
-from get_endpoints_vectors import get_endpoints_vectors, is_messy_segment,get_endpoints_vectors_precomputed
-from get_neighbors import get_neighbors, save_connections_to_csv
-from get_slices import get_slices
-from find_merge_candidates import find_merge_candidates
-from find_merge_candidates_3d_region import find_merge_candidates_3d_region
-
-# Optional EdgeCNN predictor
-import sys
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if project_root not in sys.path:
-    sys.path.append(project_root)
-
-try:
-    from edgecnn.predictor import MultimodalPredictor
-except ImportError:
-    print("Warning: could not import MultimodalPredictor. Make sure edgecnn is available on PYTHONPATH.")
-
+from probe_em.get_endpoints_vectors import is_messy_segment, get_endpoints_vectors_precomputed
+from probe_em.get_neighbors import get_neighbors, save_connections_to_csv
+from probe_em.get_slices import get_slices
+from probe_em.find_merge_candidates import find_merge_candidates
+from probe_em.find_merge_candidates_3d_region import find_merge_candidates_3d_region
 
 DEFAULT_CONFIG = {
     "raw_path": "/path/to/raw/precomputed",
     "seg_path": "/path/to/segmentation/precomputed",
     "checkpoint_sam": "/path/to/sam2_checkpoint.pt",
     "model_cfg_sam": "configs/sam2.1/sam2.1_hiera_l.yaml",
-    "checkpoint_cnn": "/path/to/edgecnn_checkpoint.pt",
     "voxel_threshold": 200,
     "sam2_num_frames": 5,
     "debug_limit": 80,
     "target_mip": 2,
     "output_root": "trace_results",
     "suffix": "sam",
-    "mode": "sam",
     "gpu_id": "0",
     "max_workers": 4,
+    "slice_workers": 8,
     "seed_ids": [123456789],
     "seed_list_file": None,
 }
@@ -56,7 +47,7 @@ def load_config(config_path):
         if not os.path.exists(config_path):
             raise FileNotFoundError(
                 f"Config file not found: {config_path}. "
-                "Copy config.example.json to config.json and edit the paths first."
+                "Copy configs/config.example.json to configs/config.json and edit the paths first."
             )
         with open(config_path, "r", encoding="utf-8") as f:
             user_config = json.load(f)
@@ -65,11 +56,7 @@ def load_config(config_path):
 
 
 def validate_config(config):
-    required_paths = ["raw_path", "seg_path"]
-    if config["mode"] == "sam":
-        required_paths.append("checkpoint_sam")
-    elif config["mode"] in ["cnn", "pointnet", "fused"]:
-        required_paths.append("checkpoint_cnn")
+    required_paths = ["raw_path", "seg_path", "checkpoint_sam", "model_cfg_sam"]
 
     missing = [
         key for key in required_paths
@@ -93,35 +80,17 @@ def load_seed_ids(config):
 
 class NeuronTracer:
     def __init__(self, raw_path, seg_path, sam_checkpoint=None, sam_cfg=None,
-                 cnn_checkpoint=None, verification_mode='sam',
-                 voxel_threshold=10000, sam2_num_frames=5, debug_limit=None,
-                 gpu_id='0'):
-        """
-        :param verification_mode: 'sam', 'cnn', 'pointnet', or 'fused'
-        """
+                 voxel_threshold=10000, sam2_num_frames=5, slice_workers=8,
+                 debug_limit=None, gpu_id='0'):
         self.raw_path = raw_path
         self.seg_path = seg_path
         self.sam_checkpoint = sam_checkpoint
         self.sam_cfg = sam_cfg
-        self.cnn_checkpoint = cnn_checkpoint
-        self.verification_mode = verification_mode
         self.gpu_id = gpu_id
-        
-        # Treat non-SAM modes as multimodal verification modes.
-        is_multimodal = verification_mode in ['cnn', 'pointnet', 'fused']
-        
-        if is_multimodal and cnn_checkpoint:
-            print(f"Initializing MultimodalPredictor ({verification_mode}) with model: {cnn_checkpoint}")
-            device = f'cuda'
-            self.cnn_predictor = MultimodalPredictor(
-                verification_mode, cnn_checkpoint, raw_path, seg_path, 
-                cube_size=(120, 120, 30), device=device
-            )
-        else:
-            self.cnn_predictor = None
 
         self.voxel_threshold = voxel_threshold
         self.sam2_num_frames = sam2_num_frames
+        self.slice_workers = slice_workers
         self.debug_limit = debug_limit
 
         self.stack = []
@@ -151,7 +120,7 @@ class NeuronTracer:
         process_count = 0
 
         print(f"Starting tracing from seed ID: {seed_id}")
-        print(f"Config: voxel_threshold={self.voxel_threshold}, debug_limit={self.debug_limit}, mode={self.verification_mode}")
+        print(f"Config: voxel_threshold={self.voxel_threshold}, debug_limit={self.debug_limit}")
 
         while self.stack:
             if self.debug_limit and process_count >= self.debug_limit:
@@ -194,44 +163,32 @@ class NeuronTracer:
                     # print("No geometric neighbors found.")
                     continue
 
-                if self.verification_mode == 'sam':
-                    # SAM 2 verification.
-                    temp_slice_dir = os.path.join(save_path, f'temp_slices_{current_id}')
-                    temp_vis_dir = os.path.join(save_path, f'temp_vis_{current_id}')
-                    temp_slice3d_dir = os.path.join(save_path, f'temp_slices3d_{current_id}')
-                    temp_vis3d_dir = os.path.join(save_path, f'temp_vis3d_{current_id}')
+                temp_slice_dir = os.path.join(save_path, f'temp_slices_{current_id}')
+                temp_vis_dir = os.path.join(save_path, f'temp_vis_{current_id}')
+                temp_slice3d_dir = os.path.join(save_path, f'temp_slices3d_{current_id}')
+                temp_vis3d_dir = os.path.join(save_path, f'temp_vis3d_{current_id}')
 
-                    if not os.path.exists(temp_vis_dir): os.makedirs(temp_vis_dir)
-                    if not os.path.exists(temp_vis3d_dir): os.makedirs(temp_vis3d_dir)
-                    save_connections_to_csv(connections, os.path.join(temp_vis_dir, 'neighbors.csv'))
+                if not os.path.exists(temp_vis_dir): os.makedirs(temp_vis_dir)
+                if not os.path.exists(temp_vis3d_dir): os.makedirs(temp_vis3d_dir)
+                save_connections_to_csv(connections, os.path.join(temp_vis_dir, 'neighbors.csv'))
 
-                    z_gap_conns = get_slices(self.raw_path, self.seg_path, connections, temp_slice_dir, temp_slice3d_dir,
-                                            max_workers=8, num_frames=self.sam2_num_frames)
-                    save_connections_to_csv(z_gap_conns, os.path.join(temp_vis3d_dir, 'neighbors_z.csv'))
-                    
-                    merged_candidates = find_merge_candidates(
-                        self.sam_checkpoint, self.sam_cfg,
-                        temp_slice_dir, temp_vis_dir, save_temp=False
-                    )
-                    merged_candidates_3d = find_merge_candidates_3d_region(
-                        self.sam_checkpoint, self.sam_cfg,
-                        temp_slice3d_dir, temp_vis3d_dir, save_temp=False
-                    )
-                    merged_candidates = list(set(merged_candidates).union(merged_candidates_3d))
-                    # print(f"SAM 2 verified connections: {merged_candidates}")
-
-                elif self.verification_mode in ['cnn', 'pointnet', 'fused'] and self.cnn_predictor:
-                    # Multimodal verification.
-                    batch_results = self.cnn_predictor.predict_batch(connections, max_workers=8)
-                    
-                    merged_candidates = []
-                    for i, (is_merge, prob) in enumerate(batch_results):
-                        if is_merge:
-                            neighbor_id = int(connections[i]['neighbor_id'])
-                            merged_candidates.append(neighbor_id)
-                else:
-                    print("Error: unknown verification mode or predictor was not initialized.")
-                    continue
+                z_gap_conns = get_slices(
+                    self.raw_path, self.seg_path, connections, temp_slice_dir,
+                    temp_slice3d_dir, max_workers=self.slice_workers,
+                    num_frames=self.sam2_num_frames
+                )
+                save_connections_to_csv(z_gap_conns, os.path.join(temp_vis3d_dir, 'neighbors_z.csv'))
+                
+                merged_candidates = find_merge_candidates(
+                    self.sam_checkpoint, self.sam_cfg,
+                    temp_slice_dir, temp_vis_dir, save_temp=False
+                )
+                merged_candidates_3d = find_merge_candidates_3d_region(
+                    self.sam_checkpoint, self.sam_cfg,
+                    temp_slice3d_dir, temp_vis3d_dir, save_temp=False
+                )
+                merged_candidates = list(set(merged_candidates).union(merged_candidates_3d))
+                # print(f"SAM 2 verified connections: {merged_candidates}")
 
                 for child_id_str in merged_candidates:
                     try:
@@ -301,9 +258,9 @@ def run_one_seed(seed_id, config):
     tracer = NeuronTracer(
         config['raw_path'], config['seg_path'], 
         sam_checkpoint=config['checkpoint_sam'], sam_cfg=config['model_cfg_sam'],
-        cnn_checkpoint=config['checkpoint_cnn'], verification_mode=config['mode'],
         voxel_threshold=config['voxel_threshold'],
         sam2_num_frames=config['sam2_num_frames'], 
+        slice_workers=int(config.get('slice_workers', 8)),
         debug_limit=config['debug_limit'],
         gpu_id=config.get('gpu_id', '0')
     )
@@ -321,8 +278,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Probe-EM tracing.")
     parser.add_argument(
         "--config",
-        default="config.json",
-        help="Path to a JSON config file. Copy config.example.json to config.json first.",
+        default="configs/config.json",
+        help="Path to a JSON config file. Copy configs/config.example.json to configs/config.json first.",
     )
     args = parser.parse_args()
 
@@ -338,9 +295,8 @@ if __name__ == "__main__":
 
     max_workers = int(config.get("max_workers", 4))
 
-    model_path = config["checkpoint_cnn"] if config["mode"] != "sam" else config["checkpoint_sam"]
-    print(f"Starting Probe-EM tracing with {max_workers} workers, mode={config['mode']}")
-    print(f"Model path: {model_path}")
+    print(f"Starting Probe-EM tracing with {max_workers} workers")
+    print(f"SAM 2 checkpoint: {config['checkpoint_sam']}")
     t1 = time.time()
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:

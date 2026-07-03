@@ -9,9 +9,9 @@
   "target_mip": 2,
   "output_root": "trace_results",
   "suffix": "sam",
-  "mode": "sam",
   "gpu_id": "0",
   "max_workers": 4,
+  "slice_workers": 8,
   "seed_ids": [123456789],
   "seed_list_file": null
 }
