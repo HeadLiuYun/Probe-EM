@@ -1,5 +1,9 @@
 # Probe-EM
 
+[English](README.md) | [中文](README_zh.md)
+
+[![arXiv](https://img.shields.io/badge/arXiv-2607.04696-b31b1b.svg)](https://arxiv.org/abs/2607.04696)
+
 Official implementation of the MICCAI 2026 paper:
 
 **Probe-EM: Targeted Neuron Tracing via Training-Free Semantic Verification**
@@ -8,6 +12,8 @@ Probe-EM is a targeted neuron tracing framework for large-scale electron
 microscopy volumes. It starts from seed segment IDs, searches geometrically
 plausible neighboring segments, and verifies candidate connections with SAM
 2-based semantic verification.
+
+Paper: [arXiv:2607.04696](https://arxiv.org/abs/2607.04696)
 
 ## Repository Structure
 
@@ -129,4 +135,18 @@ Useful hotkeys in the Neuroglancer viewer:
 - `b`: jump to the configured `home_position`, if provided.
 - `c`: clear selected segments and log annotations.
 
+## Citation
 
+If you find this repository useful, please cite our paper:
+
+```bibtex
+@article{jiang2026probeem,
+  title={Probe-EM: Targeted Neuron Tracing via Training-Free Semantic Verification},
+  author={Jiang, Liuyun and Zhang, Yanchao and Guo, Jinyue and Chen, Chuanyue and Yan, Haiyang and Yuan, Ye and Liu, Jing and Han, Hua},
+  journal={arXiv preprint arXiv:2607.04696},
+  year={2026}
+}
+```
+
+The official proceedings citation will be added after the MICCAI 2026 version is
+available.
