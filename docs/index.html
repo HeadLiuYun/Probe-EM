@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Watch the Probe-EM neuron tracing demo. MICCAI 2026 paper and source code.">
+  <meta name="theme-color" content="#ffffff">
+  <title>Probe-EM | Tracing Demo</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #ffffff;
+      color: #202124;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main { max-width: 1120px; margin: 0 auto; padding: 32px 24px; }
+    .venue { margin: 0 0 8px; color: #17646d; font-size: 14px; font-weight: 650; }
+    h1 { margin: 0; font-size: 34px; line-height: 1.2; }
+    .subtitle { max-width: 760px; margin: 12px 0 18px; font-size: 18px; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 24px; }
+    a { color: #17646d; text-underline-offset: 4px; }
+    nav a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+    a:hover { color: #0a4148; }
+    a:focus-visible { outline: 2px solid #17646d; outline-offset: 4px; }
+    figure { margin: 0; }
+    video { display: block; width: 100%; height: auto; background: #f2f4f4; }
+    figcaption { margin-top: 12px; color: #555b60; font-size: 14px; }
+    .error { padding: 12px 0; color: #9b3030; }
+    @media (max-width: 600px) {
+      main { padding: 24px 16px; }
+      h1 { font-size: 30px; }
+      .subtitle { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="venue">MICCAI 2026</p>
+      <h1>Probe-EM</h1>
+      <p class="subtitle">Targeted Neuron Tracing via Training-Free Semantic Verification</p>
+      <nav aria-label="Project links">
+        <a href="https://arxiv.org/abs/2607.04696">Paper</a>
+        <a href="https://github.com/HeadLiuYun/Probe-EM">Code on GitHub</a>
+        <a href="videos/probe-em-tracing-demo.mp4" download>Download video</a>
+      </nav>
+    </header>
+    <figure>
+      <video id="demo" controls playsinline preload="metadata" width="1920" height="1080" aria-label="Probe-EM tracing demonstration">
+        <source src="videos/probe-em-tracing-demo.mp4" type="video/mp4">
+        Your browser does not support video playback.
+        <a href="videos/probe-em-tracing-demo.mp4">Download the video</a>.
+      </video>
+      <figcaption>Probe-EM neuron tracing demonstration.</figcaption>
+    </figure>
+    <p id="video-error" class="error" role="status" hidden>
+      The video could not be loaded.
+      <a href="videos/probe-em-tracing-demo.mp4" download>Download the MP4</a> to watch it locally.
+    </p>
+  </main>
+  <script>
+    const video = document.getElementById('demo');
+    const showVideoError = () => { document.getElementById('video-error').hidden = false; };
+    video.addEventListener('error', showVideoError);
+    video.querySelector('source').addEventListener('error', showVideoError);
+  </script>
+</body>
+</html>

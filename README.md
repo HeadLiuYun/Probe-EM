@@ -15,10 +15,18 @@ plausible neighboring segments, and verifies candidate connections with SAM
 
 Paper: [arXiv:2607.04696](https://arxiv.org/abs/2607.04696)
 
+## Demo
+
+[Watch the tracing demo](https://headliuyun.github.io/Probe-EM/)
+or [download the video](docs/videos/probe-em-tracing-demo.mp4).
+
+The demo page includes links to the paper and code.
+
 ## Repository Structure
 
 ```text
 Probe-EM/
+  docs/                 Demo page and video for GitHub Pages
   configs/              Example configuration files
   probe_em/             Core tracing and semantic verification modules
   scripts/              Entry-point scripts for tracing, evaluation, and review

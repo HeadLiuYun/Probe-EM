@@ -12,10 +12,17 @@ Probe-EM 是一个面向大规模电子显微镜体数据的目标神经元追�
 
 论文：[arXiv:2607.04696](https://arxiv.org/abs/2607.04696)
 
+## 演示视频
+
+[在线观看追踪演示](https://headliuyun.github.io/Probe-EM/)，或[下载视频](docs/videos/probe-em-tracing-demo.mp4)。
+
+视频展示页同时提供论文和代码入口。
+
 ## 仓库结构
 
 ```text
 Probe-EM/
+  docs/                 GitHub Pages 视频展示页和视频文件
   configs/              示例配置文件
   probe_em/             核心追踪和语义验证模块
   scripts/              追踪、评估、人工校验入口脚本
